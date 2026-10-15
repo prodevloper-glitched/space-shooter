@@ -14,27 +14,39 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Unzip Project Files
+      - name: Unzip and Fix Xcode Project
         run: |
           unzip -o -q SpaceShooter-iOS.zip || true
-          ls -la
+          
+          # Fix AI syntax error: replace PBXConfigurationList with valid XCConfigurationList
+          find . -name "project.pbxproj" -exec sed -i '' 's/PBXConfigurationList/XCConfigurationList/g' {} +
+          
+          echo "Fixed project.pbxproj syntax"
 
       - name: Build Xcode Project
         run: |
-          xcodebuild clean archive \
+          # Detect available scheme
+          SCHEME=$(xcodebuild -list -project SpaceShooter.xcodeproj | awk '/Schemes:/{flag=1;next}/^$/{flag=0}flag' | tr -d ' ' | head -n 1)
+          if [ -z "$SCHEME" ]; then
+            SCHEME="SpaceShooter"
+          fi
+          echo "Selected Scheme: $SCHEME"
+
+          xcodebuild clean build \
             -project SpaceShooter.xcodeproj \
-            -scheme SpaceShooter \
+            -scheme "$SCHEME" \
             -configuration Release \
-            -destination 'generic/platform=iOS' \
-            -archivePath build/SpaceShooter.xcarchive \
+            -sdk iphoneos \
+            -derivedDataPath ./build_output \
+            CODE_SIGNING_ALLOWED=NO \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO
+            AD_HOC_CODE_SIGNING_ALLOWED=YES
 
-      - name: Package IPA
+      - name: Package Payload to IPA
         run: |
           mkdir -p Payload
-          APP_PATH=$(find build/SpaceShooter.xcarchive -name "SpaceShooter.app" -type d | head -n 1)
+          APP_PATH=$(find ./build_output -name "*.app" -type d | head -n 1)
           if [ -z "$APP_PATH" ]; then
             APP_PATH=$(find . -name "*.app" -type d | head -n 1)
           fi
