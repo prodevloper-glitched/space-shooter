@@ -14,11 +14,15 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Unzip Project Files
+        run: |
+          unzip -o SpaceShooter-iOS.zip
+          ls -la
+
       - name: Select Xcode Version
         run: sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
 
       - name: Build Xcode Project
-        working-directory: ios-app
         run: |
           xcodebuild -project SpaceShooter.xcodeproj \
             -scheme SpaceShooter \
@@ -26,17 +30,21 @@ jobs:
             -destination 'generic/platform=iOS' \
             -archivePath build/SpaceShooter.xcarchive \
             CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             archive
 
       - name: Package IPA
-        working-directory: ios-app
         run: |
           mkdir -p Payload
-          cp -r build/SpaceShooter.xcarchive/Products/Applications/SpaceShooter.app Payload/
+          # Automatically find SpaceShooter.app inside the archive
+          APP_PATH=$(find build/SpaceShooter.xcarchive -name "SpaceShooter.app" -type d | head -n 1)
+          if [ -z "$APP_PATH" ]; then
+            APP_PATH=$(find . -name "*.app" -type d | head -n 1)
+          fi
+          cp -r "$APP_PATH" Payload/
           zip -r SpaceShooter.ipa Payload
-          mv SpaceShooter.ipa ../SpaceShooter.ipa
+          ls -lh SpaceShooter.ipa
 
       - name: Upload Downloadable IPA Artifact
         uses: actions/upload-artifact@v4
